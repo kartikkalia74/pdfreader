@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Statement Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="header-left">
+                    <h1><i class="fas fa-chart-line"></i> Bank Statement Analyzer</h1>
+                    <p class="subtitle">Process, filter, and analyze your bank statements</p>
+                </div>
+                <div class="header-right">
+                    <button class="icon-btn" id="themeToggle" title="Toggle theme">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <button class="icon-btn" id="exportBtn" title="Export data">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- File Upload Section -->
+        <section class="upload-section">
+            <h2><i class="fas fa-cloud-upload-alt"></i> Upload PDF</h2>
+            <div class="upload-area">
+                <div class="upload-dropzone" id="dropzone">
+                    <i class="fas fa-file-pdf upload-icon"></i>
+                    <p class="upload-text">Drag & drop PDF files here or <span class="upload-link">browse</span></p>
+                    <input type="file" id="fileInput" accept=".pdf" />
+                </div>
+                <button onclick="handleUpload()" id="uploadBtn" class="btn-upload">
+                    <i class="fas fa-upload"></i> Upload & Process
+                </button>
+                <div id="uploadStatus"></div>
+            </div>
+        </section>
+
+        <!-- Controls Section -->
+        <section class="controls-section">
+            <div class="section-header">
+                <h2><i class="fas fa-sliders-h"></i> Filters & Controls</h2>
+                <button class="btn-collapse" id="controlsToggle">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <div class="controls-content" id="controlsContent">
+                <div class="controls-grid">
+                    <!-- Refresh Button -->
+                    <div class="control-group">
+                        <button onclick="loadTransactions(true)" id="refreshBtn" class="btn-primary">
+                            <i class="fas fa-sync-alt"></i> Refresh All
+                        </button>
+                        <span id="lastUpdate"></span>
+                    </div>
+
+                    <!-- Filters -->
+                    <div class="control-group">
+                        <h3><i class="fas fa-filter"></i> Filters</h3>
+                        <div class="filter-row">
+                            <label><i class="fas fa-calendar"></i> Date Range:</label>
+                            <div class="date-inputs">
+                                <input type="date" id="dateFrom" />
+                                <span class="date-separator">to</span>
+                                <input type="date" id="dateTo" />
+                            </div>
+                        </div>
+                        <div class="filter-row">
+                            <label><i class="fas fa-rupee-sign"></i> Amount Range:</label>
+                            <div class="amount-inputs">
+                                <input type="number" id="amountMin" placeholder="Min" step="0.01" />
+                                <span class="amount-separator">-</span>
+                                <input type="number" id="amountMax" placeholder="Max" step="0.01" />
+                            </div>
+                        </div>
+                        <div class="filter-row">
+                            <label><i class="fas fa-exchange-alt"></i> Transaction Type:</label>
+                            <select id="typeFilter">
+                                <option value="">All</option>
+                                <option value="DEBIT">Debit</option>
+                                <option value="CREDIT">Credit</option>
+                            </select>
+                        </div>
+                        <div class="filter-row">
+                            <label><i class="fas fa-repeat"></i> Subscription:</label>
+                            <select id="subscriptionFilter">
+                                <option value="">All</option>
+                                <option value="subscriptions">Subscriptions only</option>
+                                <option value="non-subscriptions">Exclude subscriptions</option>
+                            </select>
+                        </div>
+                        <div class="filter-row">
+                            <label><i class="fas fa-tags"></i> Category:</label>
+                            <select id="categoryFilter">
+                                <option value="">All</option>
+                            </select>
+                        </div>
+                        <div class="filter-row category-add-row">
+                            <label><i class="fas fa-plus-circle"></i> Add Category:</label>
+                            <div class="category-add">
+                                <input type="text" id="newCategoryLabel" placeholder="e.g., Insurance" />
+                                <button type="button" class="btn-add-category" onclick="handleAddCategory(event)">
+                                    <i class="fas fa-plus"></i> Add
+                                </button>
+                            </div>
+                            <small class="category-status" id="categoryAddStatus"></small>
+                        </div>
+                        <div class="filter-row">
+                            <label><i class="fas fa-search"></i> Description:</label>
+                            <div class="search-wrapper">
+                                <input type="text" id="descriptionFilter" placeholder="Search description..." />
+                                <i class="fas fa-search search-icon"></i>
+                            </div>
+                        </div>
+                        <div class="filter-row">
+                            <label><i class="fas fa-file-pdf"></i> Source File:</label>
+                            <select id="sourceFileFilter" multiple>
+                                <option value="">All Files</option>
+                            </select>
+                        </div>
+                        <button class="btn-clear-filters" onclick="clearFilters()">
+                            <i class="fas fa-times"></i> Clear All Filters
+                        </button>
+                    </div>
+
+                    <!-- Sort Options -->
+                    <div class="control-group">
+                        <h3><i class="fas fa-sort"></i> Sort By</h3>
+                        <div class="filter-row">
+                            <select id="sortBy">
+                                <option value="date">Date</option>
+                                <option value="amount">Amount</option>
+                                <option value="description">Description</option>
+                                <option value="type">Type</option>
+                                <option value="category">Category</option>
+                            </select>
+                            <select id="sortOrder">
+                                <option value="desc">Descending</option>
+                                <option value="asc">Ascending</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Group Options -->
+                    <div class="control-group">
+                        <h3><i class="fas fa-layer-group"></i> Group By</h3>
+                        <div class="filter-row">
+                            <select id="groupBy">
+                                <option value="">None</option>
+                                <option value="date">Date</option>
+                                <option value="dateWeek">Week</option>
+                                <option value="dateMonth">Month</option>
+                                <option value="type">Type</option>
+                                <option value="description">Merchant</option>
+                                <option value="sourceFile">Source File</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Statistics Dashboard -->
+        <section class="stats-section">
+            <h2><i class="fas fa-chart-bar"></i> Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-list"></i></div>
+                    <div class="stat-label">Total Transactions</div>
+                    <div class="stat-value" id="statTotal">0</div>
+                </div>
+                <div class="stat-card stat-card-debit">
+                    <div class="stat-icon"><i class="fas fa-arrow-down"></i></div>
+                    <div class="stat-label">Total Debits</div>
+                    <div class="stat-value debit" id="statDebits">₹0</div>
+                </div>
+                <div class="stat-card stat-card-credit">
+                    <div class="stat-icon"><i class="fas fa-arrow-up"></i></div>
+                    <div class="stat-label">Total Credits</div>
+                    <div class="stat-value credit" id="statCredits">₹0</div>
+                </div>
+                <div class="stat-card stat-card-net">
+                    <div class="stat-icon"><i class="fas fa-balance-scale"></i></div>
+                    <div class="stat-label">Net Amount</div>
+                    <div class="stat-value" id="statNet">₹0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-repeat"></i></div>
+                    <div class="stat-label">Subscriptions</div>
+                    <div class="stat-value" id="statSubscriptions">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-filter"></i></div>
+                    <div class="stat-label">Filtered Count</div>
+                    <div class="stat-value" id="statFiltered">0</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Transactions Table -->
+        <section class="transactions-section">
+            <div class="section-header">
+                <h2><i class="fas fa-table"></i> Transactions</h2>
+                <div class="table-controls">
+                    <button class="btn-icon" id="tableViewBtn" title="Table View">
+                        <i class="fas fa-table"></i>
+                    </button>
+                    <button class="btn-icon" id="cardViewBtn" title="Card View">
+                        <i class="fas fa-th"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="loadingIndicator" class="loading">
+                <div class="spinner"></div>
+                <p>Loading transactions...</p>
+            </div>
+            <div id="transactionsContainer"></div>
+        </section>
+    </div>
+
+    <script>
+        let allTransactions = [];
+        let filteredTransactions = [];
+        let rawTransactions = [];
+        let duplicateGroups = [];
+        let summaryData = null;
+        let currentView = 'table'; // 'table' or 'card'
+        const DEFAULT_CATEGORY_OPTIONS = [
+            { value: 'foods', label: 'Foods & Dining' },
+            { value: 'fuel', label: 'Fuel' },
+            { value: 'recharge', label: 'Recharge & Utilities' },
+            { value: 'mutual_fund', label: 'Mutual Fund' },
+            { value: 'credit_bills', label: 'Credit Bills' },
+            { value: 'income', label: 'Income' },
+            { value: 'others', label: 'Others' }
+        ];
+        let categoryOptions = [...DEFAULT_CATEGORY_OPTIONS];
+
+        // Load transactions on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchCategoryMetadata().finally(() => {
+                populateCategoryFilter();
+                loadTransactions();
+            });
+            setupEventListeners();
+            setupUI();
+        });
+
+        function setupUI() {
+            // Theme toggle
+            const themeToggle = document.getElementById('themeToggle');
+            const isDark = localStorage.getItem('theme') === 'dark';
+            if (isDark) {
+                document.body.classList.add('dark-theme');
+                themeToggle.querySelector('i').classList.replace('fa-moon', 'fa-sun');
+            }
+            
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('dark-theme');
+                const icon = themeToggle.querySelector('i');
+                if (document.body.classList.contains('dark-theme')) {
+                    localStorage.setItem('theme', 'dark');
+                    icon.classList.replace('fa-moon', 'fa-sun');
+                } else {
+                    localStorage.setItem('theme', 'light');
+                    icon.classList.replace('fa-sun', 'fa-moon');
+                }
+            });
+
+            // Controls collapse
+            const controlsToggle = document.getElementById('controlsToggle');
+            const controlsContent = document.getElementById('controlsContent');
+            controlsToggle.addEventListener('click', () => {
+                controlsContent.classList.toggle('collapsed');
+                const icon = controlsToggle.querySelector('i');
+                icon.classList.toggle('fa-chevron-down');
+                icon.classList.toggle('fa-chevron-up');
+            });
+
+            // View toggle
+            document.getElementById('tableViewBtn').addEventListener('click', () => {
+                currentView = 'table';
+                applyFilters();
+            });
+            document.getElementById('cardViewBtn').addEventListener('click', () => {
+                currentView = 'card';
+                applyFilters();
+            });
+
+            // Export button
+            document.getElementById('exportBtn').addEventListener('click', exportData);
+
+            // Drag and drop
+            const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('fileInput');
+            
+            dropzone.addEventListener('click', () => fileInput.click());
+            
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('dragover');
+            });
+            
+            dropzone.addEventListener('dragleave', () => {
+                dropzone.classList.remove('dragover');
+            });
+            
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) {
+                    fileInput.files = e.dataTransfer.files;
+                    handleUpload();
+                }
+            });
+        }
+
+        async function fetchCategoryMetadata() {
+            try {
+                const response = await fetch('/api/categories');
+                const result = await response.json();
+                if (result.success && result.data && Array.isArray(result.data.options)) {
+                    categoryOptions = result.data.options;
+                }
+            } catch (error) {
+                console.warn('Category metadata fetch failed:', error);
+                categoryOptions = [...DEFAULT_CATEGORY_OPTIONS];
+            }
+        }
+
+        function populateCategoryFilter() {
+            const select = document.getElementById('categoryFilter');
+            if (!select) return;
+
+            const previouslySelected = select.value;
+            select.innerHTML = '<option value="">All</option>';
+
+            categoryOptions.forEach(option => {
+                const optEl = document.createElement('option');
+                optEl.value = option.value;
+                optEl.textContent = option.label;
+                if (option.value === previouslySelected) {
+                    optEl.selected = true;
+                }
+                select.appendChild(optEl);
+            });
+        }
+
+        function setCategoryStatus(message, type = 'info') {
+            const statusEl = document.getElementById('categoryAddStatus');
+            if (!statusEl) return;
+            statusEl.textContent = message || '';
+            statusEl.className = `category-status ${type}`;
+            if (!message) {
+                statusEl.classList.remove('info', 'success', 'error');
+            }
+        }
+
+        async function handleAddCategory(event) {
+            if (event) {
+                event.preventDefault();
+            }
+            const input = document.getElementById('newCategoryLabel');
+            if (!input) {
+                return;
+            }
+            const label = input.value.trim();
+            if (!label) {
+                setCategoryStatus('Please enter a category name.', 'error');
+                return;
+            }
+
+            setCategoryStatus('Adding category...', 'info');
+            try {
+                const response = await fetch('/api/categories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ label })
+                });
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to add category');
+                }
+
+                if (result.data && Array.isArray(result.data.options)) {
+                    categoryOptions = result.data.options;
+                    populateCategoryFilter();
+                }
+
+                input.value = '';
+                setCategoryStatus('Category added successfully.', 'success');
+                applyFilters();
+            } catch (error) {
+                setCategoryStatus(error.message, 'error');
+            }
+        }
+
+        function clearFilters() {
+            document.getElementById('dateFrom').value = '';
+            document.getElementById('dateTo').value = '';
+            document.getElementById('amountMin').value = '';
+            document.getElementById('amountMax').value = '';
+            document.getElementById('typeFilter').value = '';
+            document.getElementById('subscriptionFilter').value = '';
+            document.getElementById('categoryFilter').value = '';
+            document.getElementById('descriptionFilter').value = '';
+            document.getElementById('sourceFileFilter').selectedIndex = 0;
+            applyFilters();
+        }
+
+        function exportData() {
+            const data = filteredTransactions.map(tx => ({
+                Date: tx.date || '',
+                Time: tx.time || '',
+                Description: tx.description || '',
+                Type: tx.type || '',
+                Category: formatCategoryLabel(tx.category),
+                Amount: tx.amount || '',
+                Source: tx.sourceFile || '',
+                Tags: getTransactionTags(tx).join('; '),
+                Subscription: tx.isSubscription ? 'Yes' : 'No',
+                SubscriptionReason: tx.subscriptionReason || ''
+            }));
+
+            const csv = [
+                Object.keys(data[0] || {}).join(','),
+                ...data.map(row => Object.values(row).map(v => `"${v}"`).join(','))
+            ].join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function setupEventListeners() {
+            // Filter inputs
+            document.getElementById('dateFrom').addEventListener('change', applyFilters);
+            document.getElementById('dateTo').addEventListener('change', applyFilters);
+            document.getElementById('amountMin').addEventListener('input', applyFilters);
+            document.getElementById('amountMax').addEventListener('input', applyFilters);
+            document.getElementById('typeFilter').addEventListener('change', applyFilters);
+            document.getElementById('subscriptionFilter').addEventListener('change', applyFilters);
+            document.getElementById('categoryFilter').addEventListener('change', applyFilters);
+            document.getElementById('descriptionFilter').addEventListener('input', applyFilters);
+            document.getElementById('sourceFileFilter').addEventListener('change', applyFilters);
+
+            // Sort options
+            document.getElementById('sortBy').addEventListener('change', applyFilters);
+            document.getElementById('sortOrder').addEventListener('change', applyFilters);
+
+            // Group options
+            document.getElementById('groupBy').addEventListener('change', applyFilters);
+
+            const newCategoryInput = document.getElementById('newCategoryLabel');
+            if (newCategoryInput) {
+                newCategoryInput.addEventListener('keypress', (event) => {
+                    if (event.key === 'Enter') {
+                        handleAddCategory(event);
+                    }
+                });
+            }
+        }
+
+        async function loadTransactions(forceRefresh = false) {
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            loadingIndicator.style.display = 'block';
+
+            try {
+                const response = await fetch(`/api/transactions?force=${forceRefresh}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    rawTransactions = result.data.transactions || [];
+                    duplicateGroups = result.data.duplicateGroups || [];
+                    summaryData = result.data.summary || null;
+
+                    const serverCollapsed = result.data.collapsedTransactions;
+                    if (Array.isArray(serverCollapsed) && serverCollapsed.length > 0) {
+                        allTransactions = serverCollapsed;
+                    } else {
+                        allTransactions = buildCollapsedTransactions(rawTransactions);
+                    }
+
+                    if (summaryData && summaryData.timestamp) {
+                        updateLastUpdate(summaryData.timestamp);
+                    }
+
+                    if (summaryData && summaryData.files) {
+                        updateSourceFileFilter(summaryData.files);
+                    }
+                    applyFilters();
+                } else {
+                    alert('Error loading transactions: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error loading transactions: ' + error.message);
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+
+        function buildCollapsedTransactions(transactions) {
+            if (!Array.isArray(transactions) || transactions.length === 0) {
+                return [];
+            }
+
+            const groups = {};
+
+            transactions.forEach((tx, index) => {
+                if (!tx || typeof tx !== 'object') {
+                    return;
+                }
+
+                let groupKey = tx.duplicateGroupKey;
+
+                if (!groupKey) {
+                    const normalizedDate = tx.date || tx.originalDate || '';
+                    const amountValue = (typeof tx.amountValue === 'number')
+                        ? tx.amountValue
+                        : parseAmount(tx.amount);
+
+                    if (normalizedDate && !Number.isNaN(amountValue)) {
+                        groupKey = `${normalizedDate}:${amountValue.toFixed(2)}`;
+                    } else {
+                        groupKey = `__ungrouped__${index}`;
+                    }
+                }
+
+                if (!groups[groupKey]) {
+                    groups[groupKey] = [];
+                }
+
+                groups[groupKey].push({
+                    ...tx,
+                    duplicateGroupKey: groupKey
+                });
+            });
+
+            return Object.entries(groups).map(([groupKey, txs]) => {
+                const representative = txs[0];
+                const duplicateCount = txs.length;
+                const amountValue = (typeof representative.amountValue === 'number')
+                    ? representative.amountValue
+                    : parseAmount(representative.amount);
+                const hasValidAmount = Number.isFinite(amountValue);
+                const formattedAmount = representative.amount || (hasValidAmount ? formatAmount(amountValue) : '-');
+                const uniqueSources = Array.from(new Set(
+                    txs
+                        .map(tx => tx.sourceFile)
+                        .filter(Boolean)
+                ));
+
+                let sourceDisplay = representative.sourceFile || '-';
+                if (uniqueSources.length === 0) {
+                    sourceDisplay = representative.sourceFile || '-';
+                } else if (uniqueSources.length === 1) {
+                    sourceDisplay = uniqueSources[0];
+                } else {
+                    sourceDisplay = `Multiple (${uniqueSources.length} files)`;
+                }
+
+                const tags = collectUniqueTags(txs);
+                const isSubscription = txs.some(tx => tx.isSubscription);
+                const subscriptionReason = (
+                    txs.find(tx => tx.isSubscription && tx.subscriptionReason)?.subscriptionReason ||
+                    representative.subscriptionReason ||
+                    ''
+                );
+                const categoryValue = representative.category || 'others';
+                const categorySource = representative.categorySource || 'auto';
+
+                return {
+                    duplicateGroupKey: groupKey,
+                    duplicateCount,
+                    date: representative.date || representative.originalDate || '',
+                    originalDate: representative.originalDate || representative.date || '',
+                    time: representative.time || '',
+                    description: representative.description || '',
+                    type: representative.type || 'UNKNOWN',
+                    amount: formattedAmount,
+                    amountValue: hasValidAmount ? amountValue : null,
+                    currency: representative.currency || 'INR',
+                    rawLine: representative.rawLine,
+                    sourceFile: sourceDisplay,
+                    sourceFiles: uniqueSources,
+                    tags,
+                    isSubscription,
+                    subscriptionReason,
+                    category: categoryValue,
+                    categorySource,
+                    transactions: txs.map(tx => ({
+                        date: tx.date || '',
+                        originalDate: tx.originalDate || '',
+                        time: tx.time || '',
+                        description: tx.description || '',
+                        type: tx.type || 'UNKNOWN',
+                        amount: tx.amount || (hasValidAmount ? formatAmount(amountValue) : '-'),
+                        amountValue: typeof tx.amountValue === 'number' && Number.isFinite(tx.amountValue)
+                            ? tx.amountValue
+                            : (Number.isFinite(parseAmount(tx.amount)) ? parseAmount(tx.amount) : null),
+                        currency: tx.currency || 'INR',
+                        sourceFile: tx.sourceFile || representative.sourceFile,
+                        rawLine: tx.rawLine || representative.rawLine,
+                        tags: getTransactionTags(tx),
+                        isSubscription: tx.isSubscription || false,
+                        subscriptionReason: tx.subscriptionReason || '',
+                        category: tx.category || categoryValue,
+                        categorySource: tx.categorySource || categorySource,
+                        duplicateGroupKey: tx.duplicateGroupKey || groupKey
+                    }))
+                };
+            });
+        }
+
+        function updateLastUpdate(timestamp) {
+            const date = new Date(timestamp);
+            document.getElementById('lastUpdate').textContent = 
+                `Last updated: ${date.toLocaleString()}`;
+        }
+
+        function updateSourceFileFilter(files) {
+            const select = document.getElementById('sourceFileFilter');
+            // Clear existing options except "All Files"
+            select.innerHTML = '<option value="">All Files</option>';
+            
+            files.forEach(file => {
+                const option = document.createElement('option');
+                option.value = file.filename;
+                option.textContent = `${file.filename} (${file.count} transactions)`;
+                select.appendChild(option);
+            });
+        }
+
+        function applyFilters() {
+            filteredTransactions = [...allTransactions];
+
+            // Date filter
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+            if (dateFrom) {
+                filteredTransactions = filteredTransactions.filter(tx => {
+                    const txDate = parseDate(tx.date);
+                    return txDate && txDate >= new Date(dateFrom);
+                });
+            }
+            if (dateTo) {
+                filteredTransactions = filteredTransactions.filter(tx => {
+                    const txDate = parseDate(tx.date);
+                    return txDate && txDate <= new Date(dateTo);
+                });
+            }
+
+            // Amount filter
+            const amountMin = parseFloat(document.getElementById('amountMin').value);
+            const amountMax = parseFloat(document.getElementById('amountMax').value);
+            if (!isNaN(amountMin)) {
+                filteredTransactions = filteredTransactions.filter(tx => {
+                    const amount = parseAmount(tx.amount);
+                    return amount >= amountMin;
+                });
+            }
+            if (!isNaN(amountMax)) {
+                filteredTransactions = filteredTransactions.filter(tx => {
+                    const amount = parseAmount(tx.amount);
+                    return amount <= amountMax;
+                });
+            }
+
+            // Type filter
+            const typeFilter = document.getElementById('typeFilter').value;
+            if (typeFilter) {
+                filteredTransactions = filteredTransactions.filter(tx => 
+                    tx.type === typeFilter
+                );
+            }
+
+            const subscriptionFilter = document.getElementById('subscriptionFilter').value;
+            if (subscriptionFilter === 'subscriptions') {
+                filteredTransactions = filteredTransactions.filter(tx => tx.isSubscription);
+            } else if (subscriptionFilter === 'non-subscriptions') {
+                filteredTransactions = filteredTransactions.filter(tx => !tx.isSubscription);
+            }
+
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            if (categoryFilter) {
+                filteredTransactions = filteredTransactions.filter(tx => {
+                    const category = tx.category || 'others';
+                    return category === categoryFilter;
+                });
+            }
+
+            // Description filter
+            const descriptionFilter = document.getElementById('descriptionFilter').value.toLowerCase();
+            if (descriptionFilter) {
+                filteredTransactions = filteredTransactions.filter(tx =>
+                    (tx.description || '').toLowerCase().includes(descriptionFilter)
+                );
+            }
+
+            // Source file filter
+            const sourceFileFilter = Array.from(document.getElementById('sourceFileFilter').selectedOptions)
+                .map(opt => opt.value);
+            if (sourceFileFilter.length > 0 && sourceFileFilter[0] !== '') {
+                filteredTransactions = filteredTransactions.filter(tx => {
+                    const sources = Array.isArray(tx.sourceFiles) && tx.sourceFiles.length > 0
+                        ? tx.sourceFiles
+                        : (tx.sourceFile ? [tx.sourceFile] : []);
+                    return sources.some(src => sourceFileFilter.includes(src));
+                });
+            }
+
+            // Sort
+            const sortBy = document.getElementById('sortBy').value;
+            const sortOrder = document.getElementById('sortOrder').value;
+            sortTransactions(sortBy, sortOrder);
+
+            // Group
+            const groupBy = document.getElementById('groupBy').value;
+            if (groupBy) {
+                groupTransactions(groupBy);
+            } else {
+                renderTransactions(filteredTransactions);
+            }
+
+            updateStatistics();
+        }
+
+        function sortTransactions(sortBy, sortOrder) {
+            filteredTransactions.sort((a, b) => {
+                let aVal, bVal;
+
+                switch (sortBy) {
+                    case 'date':
+                        aVal = parseDate(a.date) || new Date(0);
+                        bVal = parseDate(b.date) || new Date(0);
+                        break;
+                    case 'amount':
+                        aVal = parseAmount(a.amount);
+                        bVal = parseAmount(b.amount);
+                        break;
+                    case 'description':
+                        aVal = (a.description || '').toLowerCase();
+                        bVal = (b.description || '').toLowerCase();
+                        break;
+                    case 'type':
+                        aVal = a.type || '';
+                        bVal = b.type || '';
+                        break;
+                    case 'category':
+                        aVal = a.category || 'others';
+                        bVal = b.category || 'others';
+                        break;
+                    default:
+                        return 0;
+                }
+
+                if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        function groupTransactions(groupBy) {
+            const groups = {};
+
+            filteredTransactions.forEach(tx => {
+                let key;
+
+                switch (groupBy) {
+                    case 'date':
+                        key = tx.date || 'Unknown';
+                        break;
+                    case 'dateWeek':
+                        const date = parseDate(tx.date);
+                        if (date) {
+                            const weekStart = new Date(date);
+                            weekStart.setDate(date.getDate() - date.getDay());
+                            key = weekStart.toISOString().split('T')[0] + ' (Week)';
+                        } else {
+                            key = 'Unknown';
+                        }
+                        break;
+                    case 'dateMonth':
+                        const monthDate = parseDate(tx.date);
+                        if (monthDate) {
+                            key = monthDate.toISOString().substring(0, 7);
+                        } else {
+                            key = 'Unknown';
+                        }
+                        break;
+                    case 'type':
+                        key = tx.type || 'UNKNOWN';
+                        break;
+                    case 'description':
+                        key = tx.description || 'Unknown';
+                        break;
+                    case 'sourceFile':
+                        key = tx.sourceFile || 'Unknown';
+                        break;
+                    default:
+                        key = 'Other';
+                }
+
+                if (!groups[key]) {
+                    groups[key] = [];
+                }
+                groups[key].push(tx);
+            });
+
+            renderGroupedTransactions(groups);
+        }
+
+        function collectUniqueTags(transactions) {
+            const tags = [];
+            transactions.forEach(tx => {
+                getTransactionTags(tx).forEach(tag => {
+                    const normalized = String(tag);
+                    if (!tags.includes(normalized)) {
+                        tags.push(normalized);
+                    }
+                });
+            });
+            return tags;
+        }
+
+        function getTransactionTags(tx) {
+            if (tx && Array.isArray(tx.tags) && tx.tags.length > 0) {
+                return tx.tags;
+            }
+            if (tx && tx.isSubscription) {
+                return ['subscription'];
+            }
+            return [];
+        }
+
+        function formatTagLabel(tag) {
+            const value = String(tag || '');
+            if (!value) return '';
+            return value.charAt(0).toUpperCase() + value.slice(1);
+        }
+
+        function renderTagBadges(tx) {
+            const tags = getTransactionTags(tx);
+            if (!tags.length) {
+                return '';
+            }
+            const reason = tx?.subscriptionReason || '';
+            const hasReason = Boolean(reason);
+            const badges = tags.map(tag => {
+                const normalized = String(tag).toLowerCase();
+                const label = formatTagLabel(tag);
+                const isSubscription = normalized === 'subscription';
+                const titleAttr = isSubscription && hasReason
+                    ? ` title="${escapeAttribute(reason)}"`
+                    : '';
+                return `<span class="tag-badge ${normalized}"${titleAttr}>${label}</span>`;
+            }).join('');
+            return `<div class="tag-container">${badges}</div>`;
+        }
+
+        function formatCategoryLabel(value) {
+            if (!value) return 'Others';
+            const option = categoryOptions.find(opt => opt.value === value);
+            return option ? option.label : value.charAt(0).toUpperCase() + value.slice(1);
+        }
+
+        function renderCategoryBadge(tx) {
+            const category = tx?.category || 'others';
+            const source = tx?.categorySource || 'auto';
+            const label = formatCategoryLabel(category);
+            const sourceLabel = source === 'manual' ? 'Manual' : 'Auto';
+            const sourceClass = source === 'manual' ? 'manual' : 'auto';
+            return `<span class="category-badge ${category} ${sourceClass}" title="Category: ${escapeAttribute(label)} • Source: ${sourceLabel}">${label}</span>`;
+        }
+
+        function renderCategorySelect(tx) {
+            const groupKey = tx?.duplicateGroupKey || '';
+            const currentCategory = tx?.category || 'others';
+            const options = ['<option value="auto">Auto (reset)</option>'].concat(
+                categoryOptions.map(option => {
+                    const selected = option.value === currentCategory ? 'selected' : '';
+                    return `<option value="${escapeAttribute(option.value)}" ${selected}>${escapeHtml(option.label)}</option>`;
+                })
+            );
+
+            return `
+                <select class="category-select"
+                        data-groupkey="${escapeAttribute(groupKey)}"
+                        data-prev="${escapeAttribute(currentCategory)}"
+                        onchange="handleCategoryChange(event)">
+                    ${options.join('')}
+                </select>
+            `;
+        }
+
+        function renderCategoryCell(tx) {
+            const badge = renderCategoryBadge(tx);
+            const select = renderCategorySelect(tx);
+            return `<div class="category-cell">${badge}${select}</div>`;
+        }
+
+        async function handleCategoryChange(event) {
+            const select = event.target;
+            const groupKey = select.dataset.groupkey;
+            const category = select.value;
+
+            if (!groupKey) {
+                return;
+            }
+
+            const previousValue = select.getAttribute('data-prev') || '';
+            select.disabled = true;
+
+            try {
+                const response = await fetch('/api/categories/assign', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        groupKey,
+                        category
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to update category');
+                }
+
+                select.setAttribute('data-prev', category);
+                await loadTransactions();
+            } catch (error) {
+                alert('Unable to update category: ' + error.message);
+                if (previousValue) {
+                    select.value = previousValue;
+                }
+            } finally {
+                select.disabled = false;
+            }
+        }
+
+        function renderTransactions(transactions) {
+            const container = document.getElementById('transactionsContainer');
+            
+            if (transactions.length === 0) {
+                container.innerHTML = '<div class="no-data"><i class="fas fa-inbox"></i><p>No transactions found.</p></div>';
+                return;
+            }
+
+            if (currentView === 'card') {
+                renderCardView(transactions);
+                return;
+            }
+
+            let html = '<div class="table-wrapper"><table class="transactions-table"><thead><tr>';
+            html += '<th><i class="fas fa-calendar"></i> Date</th>';
+            html += '<th><i class="fas fa-clock"></i> Time</th>';
+            html += '<th><i class="fas fa-align-left"></i> Description</th>';
+            html += '<th><i class="fas fa-tags"></i> Category</th>';
+            html += '<th><i class="fas fa-exchange-alt"></i> Type</th>';
+            html += '<th><i class="fas fa-rupee-sign"></i> Amount</th>';
+            html += '<th><i class="fas fa-file-pdf"></i> Source</th></tr></thead><tbody>';
+
+            transactions.forEach(tx => {
+                const typeClass = tx.type === 'DEBIT' ? 'debit' : 'credit';
+                const duplicateCount = tx.duplicateCount || (Array.isArray(tx.transactions) ? tx.transactions.length : 0);
+                const hasDuplicates = duplicateCount > 1;
+                const duplicateBadge = hasDuplicates
+                    ? `<span class="duplicate-badge">${duplicateCount} entries</span>`
+                    : '';
+                const sourceDisplay = tx.sourceFile || '-';
+                const tagsHtml = renderTagBadges(tx);
+
+                html += `<tr class="transaction-row ${typeClass}">`;
+                html += `<td>${tx.date || '-'}</td>`;
+                html += `<td>${tx.time || '-'}</td>`;
+                html += `<td class="description-cell">${tx.description || '-'} ${duplicateBadge}${tagsHtml}</td>`;
+                html += `<td>${renderCategoryCell(tx)}</td>`;
+                html += `<td><span class="type-badge ${typeClass}">${tx.type || 'UNKNOWN'}</span></td>`;
+                html += `<td class="amount-cell ${typeClass}">${tx.amount || '-'}</td>`;
+                html += `<td class="source-cell">${sourceDisplay}</td>`;
+                html += '</tr>';
+
+                if (hasDuplicates) {
+                    html += `<tr class="duplicate-details-row"><td colspan="7" class="duplicate-cell">`;
+                    html += `<details><summary>Show individual transactions (${duplicateCount})</summary>`;
+                    html += '<table class="duplicate-table"><thead><tr>';
+                    html += '<th>Date</th><th>Time</th><th>Description</th><th>Category</th><th>Type</th><th>Amount</th><th>Source</th><th>Raw</th>';
+                    html += '</tr></thead><tbody>';
+
+                    tx.transactions.forEach(individual => {
+                        const indTypeClass = individual.type === 'DEBIT' ? 'debit' : 'credit';
+                        const individualTags = renderTagBadges(individual);
+                        html += `<tr class="${indTypeClass}">`;
+                        html += `<td>${individual.date || '-'}</td>`;
+                        html += `<td>${individual.time || '-'}</td>`;
+                        html += `<td class="description-cell">${individual.description || '-'}${individualTags}</td>`;
+                        html += `<td>${renderCategoryCell(individual)}</td>`;
+                        html += `<td><span class="type-badge ${indTypeClass}">${individual.type || 'UNKNOWN'}</span></td>`;
+                        html += `<td class="amount-cell ${indTypeClass}">${individual.amount || '-'}</td>`;
+                        html += `<td class="source-cell">${individual.sourceFile || '-'}</td>`;
+                        html += '<td class="raw-cell">';
+                        if (individual.rawLine) {
+                            html += `<details><summary>View Raw</summary><pre>${escapeHtml(individual.rawLine)}</pre></details>`;
+                        } else {
+                            html += '-';
+                        }
+                        html += '</td>';
+                        html += '</tr>';
+                    });
+
+                    html += '</tbody></table></details>';
+                    html += '</td></tr>';
+                } else if (tx.rawLine) {
+                    html += `<tr class="raw-line-row"><td colspan="7" class="raw-line-cell">`;
+                    html += `<details><summary>View Raw Data</summary><pre>${escapeHtml(tx.rawLine)}</pre></details>`;
+                    html += '</td></tr>';
+                }
+            });
+
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        function renderCardView(transactions) {
+            const container = document.getElementById('transactionsContainer');
+            let html = '<div class="cards-grid">';
+            
+            transactions.forEach(tx => {
+                const typeClass = tx.type === 'DEBIT' ? 'debit' : 'credit';
+                const duplicateCount = tx.duplicateCount || (Array.isArray(tx.transactions) ? tx.transactions.length : 0);
+                const hasDuplicates = duplicateCount > 1;
+                const tagsHtml = renderTagBadges(tx);
+                const categoryBadge = renderCategoryBadge(tx);
+                
+                html += `<div class="transaction-card ${typeClass}">`;
+                html += `<div class="card-header">`;
+                html += `<div class="card-date">${tx.date || '-'}</div>`;
+                html += `<div class="card-time">${tx.time || ''}</div>`;
+                html += `</div>`;
+                html += `<div class="card-body">`;
+                html += `<div class="card-description">${tx.description || '-'}${tagsHtml}</div>`;
+                html += `<div class="card-category"><span class="card-category-label">Category</span>${categoryBadge}${renderCategorySelect(tx)}</div>`;
+                html += `<div class="card-amount ${typeClass}">${tx.amount || '-'}</div>`;
+                html += `</div>`;
+                html += `<div class="card-footer">`;
+                html += `<span class="type-badge ${typeClass}">${tx.type || 'UNKNOWN'}</span>`;
+                if (hasDuplicates) {
+                    html += `<span class="duplicate-badge">${duplicateCount} entries</span>`;
+                }
+                html += `<span class="card-source">${tx.sourceFile || '-'}</span>`;
+                html += `</div>`;
+                html += `</div>`;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderGroupedTransactions(groups) {
+            const container = document.getElementById('transactionsContainer');
+            
+            if (Object.keys(groups).length === 0) {
+                container.innerHTML = '<p class="no-data">No transactions found.</p>';
+                return;
+            }
+
+            let html = '';
+
+            // Sort groups
+            const sortedGroups = Object.keys(groups).sort();
+
+            sortedGroups.forEach(groupKey => {
+                const groupTransactions = groups[groupKey];
+                const groupTotal = groupTransactions.reduce((sum, tx) => {
+                    const value = parseAmount(tx.amount);
+                    return Number.isFinite(value) ? sum + value : sum;
+                }, 0);
+
+                html += `<div class="group-section">`;
+                html += `<h3 class="group-header">${escapeHtml(groupKey)} `;
+                html += `<span class="group-count">(${groupTransactions.length} transactions)</span> `;
+                html += `<span class="group-total ${groupTotal >= 0 ? 'credit' : 'debit'}">Total: ${formatAmount(groupTotal)}</span></h3>`;
+                
+                html += '<table class="transactions-table"><thead><tr>';
+                html += '<th>Date</th><th>Time</th><th>Description</th><th>Category</th><th>Type</th><th>Amount</th><th>Source</th></tr></thead><tbody>';
+
+                groupTransactions.forEach(tx => {
+                    const typeClass = tx.type === 'DEBIT' ? 'debit' : 'credit';
+                    const duplicateCount = tx.duplicateCount || (Array.isArray(tx.transactions) ? tx.transactions.length : 0);
+                    const hasDuplicates = duplicateCount > 1;
+                    const duplicateBadge = hasDuplicates
+                        ? `<span class="duplicate-badge">${duplicateCount} entries</span>`
+                        : '';
+                    const sourceDisplay = tx.sourceFile || '-';
+                    const tagsHtml = renderTagBadges(tx);
+                    
+                    html += `<tr class="transaction-row ${typeClass}">`;
+                    html += `<td>${tx.date || '-'}</td>`;
+                    html += `<td>${tx.time || '-'}</td>`;
+                    html += `<td class="description-cell">${tx.description || '-'} ${duplicateBadge}${tagsHtml}</td>`;
+                    html += `<td>${renderCategoryCell(tx)}</td>`;
+                    html += `<td><span class="type-badge ${typeClass}">${tx.type || 'UNKNOWN'}</span></td>`;
+                    html += `<td class="amount-cell ${typeClass}">${tx.amount || '-'}</td>`;
+                    html += `<td class="source-cell">${sourceDisplay}</td>`;
+                    html += '</tr>';
+
+                    if (hasDuplicates) {
+                        html += `<tr class="duplicate-details-row"><td colspan="7" class="duplicate-cell">`;
+                        html += `<details><summary>Show individual transactions (${duplicateCount})</summary>`;
+                        html += '<table class="duplicate-table"><thead><tr>';
+                        html += '<th>Date</th><th>Time</th><th>Description</th><th>Category</th><th>Type</th><th>Amount</th><th>Source</th><th>Raw</th>';
+                        html += '</tr></thead><tbody>';
+
+                        tx.transactions.forEach(individual => {
+                            const indTypeClass = individual.type === 'DEBIT' ? 'debit' : 'credit';
+                            const individualTags = renderTagBadges(individual);
+                            html += `<tr class="${indTypeClass}">`;
+                            html += `<td>${individual.date || '-'}</td>`;
+                            html += `<td>${individual.time || '-'}</td>`;
+                            html += `<td class="description-cell">${individual.description || '-'}${individualTags}</td>`;
+                            html += `<td>${renderCategoryCell(individual)}</td>`;
+                            html += `<td><span class="type-badge ${indTypeClass}">${individual.type || 'UNKNOWN'}</span></td>`;
+                            html += `<td class="amount-cell ${indTypeClass}">${individual.amount || '-'}</td>`;
+                            html += `<td class="source-cell">${individual.sourceFile || '-'}</td>`;
+                            html += '<td class="raw-cell">';
+                            if (individual.rawLine) {
+                                html += `<details><summary>View Raw</summary><pre>${escapeHtml(individual.rawLine)}</pre></details>`;
+                            } else {
+                                html += '-';
+                            }
+                            html += '</td>';
+                            html += '</tr>';
+                        });
+
+                        html += '</tbody></table></details>';
+                        html += '</td></tr>';
+                    } else if (tx.rawLine) {
+                        html += `<tr class="raw-line-row"><td colspan="7" class="raw-line-cell">`;
+                        html += `<details><summary>View Raw Data</summary><pre>${escapeHtml(tx.rawLine)}</pre></details>`;
+                        html += '</td></tr>';
+                    }
+                });
+
+                html += '</tbody></table></div>';
+            });
+
+            container.innerHTML = html;
+        }
+
+        function updateStatistics() {
+            const total = filteredTransactions.length;
+            let totalDebits = 0;
+            let totalCredits = 0;
+            let subscriptionCount = 0;
+
+            filteredTransactions.forEach(tx => {
+                const amount = parseAmount(tx.amount);
+                if (!Number.isFinite(amount)) {
+                    return;
+                }
+
+                if (tx.type === 'DEBIT') {
+                    totalDebits += Math.abs(amount);
+                } else if (tx.type === 'CREDIT') {
+                    totalCredits += amount;
+                }
+
+                if (tx.isSubscription) {
+                    subscriptionCount += 1;
+                }
+            });
+
+            const net = totalCredits - totalDebits;
+
+            document.getElementById('statTotal').textContent = allTransactions.length;
+            document.getElementById('statDebits').textContent = formatAmount(totalDebits);
+            document.getElementById('statCredits').textContent = formatAmount(totalCredits);
+            document.getElementById('statNet').textContent = formatAmount(net);
+            document.getElementById('statSubscriptions').textContent = subscriptionCount;
+            document.getElementById('statFiltered').textContent = total;
+        }
+
+        async function handleUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const uploadStatus = document.getElementById('uploadStatus');
+
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select a PDF file');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            uploadBtn.disabled = true;
+            uploadStatus.textContent = 'Uploading and processing...';
+            uploadStatus.className = 'status-info';
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    uploadStatus.textContent = 'File uploaded and processed successfully!';
+                    uploadStatus.className = 'status-success';
+                    fileInput.value = '';
+                    // Reload transactions
+                    setTimeout(() => {
+                        loadTransactions(true);
+                        uploadStatus.textContent = '';
+                    }, 2000);
+                } else {
+                    uploadStatus.textContent = 'Error: ' + result.error;
+                    uploadStatus.className = 'status-error';
+                }
+            } catch (error) {
+                uploadStatus.textContent = 'Error: ' + error.message;
+                uploadStatus.className = 'status-error';
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        }
+
+        // Helper functions
+        function parseDate(dateStr) {
+            if (!dateStr) return null;
+            
+            // Try different date formats
+            const formats = [
+                /(\d{2})\/(\d{2})\/(\d{2})/,  // DD/MM/YY
+                /(\d{2})\/(\d{2})\/(\d{4})/,  // DD/MM/YYYY
+                /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),\s+(\d{4})/  // Mon DD, YYYY
+            ];
+
+            for (const format of formats) {
+                const match = dateStr.match(format);
+                if (match) {
+                    if (format === formats[0] || format === formats[1]) {
+                        // DD/MM/YY or DD/MM/YYYY
+                        const day = parseInt(match[1]);
+                        const month = parseInt(match[2]) - 1;
+                        const year = parseInt(match[3]);
+                        const fullYear = year < 100 ? 2000 + year : year;
+                        return new Date(fullYear, month, day);
+                    } else {
+                        // Mon DD, YYYY
+                        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        const month = monthNames.indexOf(match[1]);
+                        const day = parseInt(match[2]);
+                        const year = parseInt(match[3]);
+                        return new Date(year, month, day);
+                    }
+                }
+            }
+            
+            return new Date(dateStr);
+        }
+
+        function parseAmount(amountInput) {
+            if (amountInput === null || amountInput === undefined) {
+                return NaN;
+            }
+
+            if (typeof amountInput === 'number') {
+                return Number.isFinite(amountInput) ? amountInput : NaN;
+            }
+
+            const amountStr = String(amountInput).trim();
+            if (!amountStr) {
+                return NaN;
+            }
+
+            // Remove currency symbols and commas
+            const cleaned = amountStr.replace(/[₹$,]/g, '').replace(/[^0-9.\-]/g, '');
+            const parsed = parseFloat(cleaned);
+            return Number.isFinite(parsed) ? parsed : NaN;
+        }
+
+        function formatAmount(amount) {
+            if (!Number.isFinite(amount)) {
+                return '-';
+            }
+            return '₹' + Math.abs(amount).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function escapeAttribute(value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+    </script>
+</body>
+</html>
+
